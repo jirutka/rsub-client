@@ -203,11 +203,10 @@ class Parser(configparser.ConfigParser):
         read_ok = []
         for filename in filenames:
             try:
-                file = open(filename)
-                fp = ioio.StringIO("[NOSECTION]\n" + file.read())
-                self._read(fp, filename)
-                file.close()
-            except:
+                with open(filename) as f:
+                    fp = ioio.StringIO("[NOSECTION]\n" + f.read())
+                    self._read(fp, filename)
+            except EnvironmentError:
                 continue
             read_ok.append(filename)
         return read_ok
@@ -228,10 +227,9 @@ class Command:
         self.size = len(self.data)
 
     def read_file(self, path):
-        file = open(path, 'rb')
-        self.data = file.read()
-        self.size = file.tell()
-        file.close()
+        with open(path, 'rb') as f:
+            self.data = f.read()
+            self.size = f.tell()
 
     def send(self, textmate):
         textmate.write(enc(self.command + '\n'))
