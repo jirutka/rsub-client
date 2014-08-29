@@ -12,10 +12,10 @@ from os.path import isfile
 from socket import AF_INET, SOCK_STREAM
 
 if sys.version_info >= (3, 0):
-    from configparser import ConfigParser
+    from configparser import ConfigParser, NoOptionError, NoSectionError
     from io import StringIO
 else:
-    from ConfigParser import ConfigParser
+    from ConfigParser import ConfigParser, NoOptionError, NoSectionError
     from StringIO import StringIO
 
 DATE = '2014-08-18'
@@ -161,15 +161,13 @@ class Settings:
               % (sys.argv[0], self.host, self.port))
 
     def read_disk_settings(self):
-        config = Parser()
+        config = SectionLessConfigParser()
         try:
-            config.read(['/etc/rmate.rc', os.path.expanduser('~/.rmate.rc')])
+            config.read('/etc/rmate.rc', os.path.expanduser('~/.rmate.rc'))
         except:
             log.debug("Could not read settings from disk.")
-        if config.has_option('NOSECTION', 'host'):
-            self.host = config.get('NOSECTION', 'host')
-        if config.has_option('NOSECTION', 'port'):
-            self.port = config.get('NOSECTION', 'port')
+        self.host = config['host'] or self.host
+        self.port = int(config['port'] or self.port)
 
     def parse_cli_options(self):
         try:
@@ -198,20 +196,36 @@ class Settings:
         self.files = args
 
 
-class Parser(ConfigParser):
-    def read(self, filenames):
-        if isinstance(filenames, str):
-            filenames = [filenames]
+class SectionLessConfigParser(ConfigParser):
+
+    """ ConfigParser for reading config files without sections. """
+
+    FAKE_SECTION = 'NOSECTION'
+
+    def read(self, *filenames):
+        """ Override superclass method to read & parse file(s) without section.
+
+        This implementation is quite a hack, it just inserts fake section at
+        the beginning of the file object being parsed.
+        """
         read_ok = []
         for filename in filenames:
             try:
                 with open(filename) as f:
-                    fp = StringIO("[NOSECTION]\n" + f.read())
+                    fp = StringIO("[%s]\n%s" % (self.FAKE_SECTION, f.read()))
                     self._read(fp, filename)
             except EnvironmentError:
                 continue
             read_ok.append(filename)
+
         return read_ok
+
+    def __getitem__(self, option):
+        """ Get an option value for the default section. """
+        try:
+            return self.get(self.FAKE_SECTION, option)
+        except (NoOptionError, NoSectionError):
+            return None
 
 
 class Command:
