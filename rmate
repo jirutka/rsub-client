@@ -37,7 +37,7 @@ def dec(byte_string):
         return byte_string
 
 
-def handle_save(textmate, variables, data):
+def handle_save(variables, data):
     path = variables['token']
     try:
         log('Saving %s' % path)
@@ -54,7 +54,7 @@ def handle_save(textmate, variables, data):
         log("Save failed!")
 
 
-def handle_close(textmate, variables, data):
+def handle_close(variables):
     path = variables['token']
     log("Closed %s" % path)
 
@@ -76,9 +76,9 @@ def handle_cmd(textmate, cmd):
     if 'data' in variables:
         del variables['data']
     if cmd == 'save':
-        handle_save(textmate, variables, data)
+        handle_save(variables, data)
     elif cmd == 'close':
-        handle_close(textmate, variables, data)
+        handle_close(variables)
 
 
 def connect_to_tm():
@@ -103,7 +103,7 @@ def connect_to_tm():
     return textmate
 
 
-def handle_cmds(textmate, host, port, cmds):
+def handle_cmds(textmate, cmds):
     if len(cmds) == 0:
         return
 
@@ -293,4 +293,4 @@ s = connect_to_tm()
 if not settings.wait and os.fork():
     sys.exit()
 
-handle_cmds(s, settings.host, settings.port, cmds)
+handle_cmds(s, cmds)
