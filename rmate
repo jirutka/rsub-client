@@ -5,13 +5,16 @@ import os
 import socket
 import sys
 import shutil
+from os import W_OK
+from os.path import isfile
+from socket import AF_INET, SOCK_STREAM
 
 if sys.version_info >= (3, 0):
-    import configparser
-    import io as ioio
+    from configparser import ConfigParser
+    from io import StringIO
 else:
-    import ConfigParser as configparser
-    import StringIO as ioio
+    from ConfigParser import ConfigParser
+    from StringIO import StringIO
 
 DATE = '2014-08-18'
 VERSION = '1.0.0'
@@ -42,13 +45,13 @@ def handle_save(variables, data):
     try:
         log('Saving %s' % path)
         backup_path = '%s~' % path
-        while os.path.isfile(backup_path):
+        while isfile(backup_path):
             backup_path = '%s~' % backup_path
-        if os.path.isfile(path):
+        if isfile(path):
             shutil.copy2(path, backup_path)
         file = open(path, 'wb')
         file.write(data)
-        if os.path.isfile(backup_path):
+        if isfile(backup_path):
             os.remove(backup_path)
     except (IOError, OSError):
         log("Save failed!")
@@ -84,7 +87,7 @@ def handle_cmd(textmate, cmd):
 def connect_to_tm():
     try:
         socket.setdefaulttimeout(5)
-        textmate_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        textmate_sock = socket.socket(AF_INET, SOCK_STREAM)
         textmate_sock.connect((settings.host, settings.port))
         textmate_sock.setblocking(True)
         textmate = textmate_sock.makefile('rwb')
@@ -196,7 +199,7 @@ class Settings:
         self.files = args
 
 
-class Parser(configparser.ConfigParser):
+class Parser(ConfigParser):
     def read(self, filenames):
         if isinstance(filenames, str):
             filenames = [filenames]
@@ -204,7 +207,7 @@ class Parser(configparser.ConfigParser):
         for filename in filenames:
             try:
                 with open(filename) as f:
-                    fp = ioio.StringIO("[NOSECTION]\n" + f.read())
+                    fp = StringIO("[NOSECTION]\n" + f.read())
                     self._read(fp, filename)
             except EnvironmentError:
                 continue
@@ -252,7 +255,7 @@ for idx, path in enumerate(settings.files):
     elif os.path.isdir(path):
         sys.stderr.write("'%s' is a directory!\n" % path)
         continue
-    elif os.path.isfile(path) and not os.access(path, os.W_OK):
+    elif isfile(path) and not os.access(path, W_OK):
         if settings.force:
             log("File %s is not writable. Opening anyway." % path)
         else:
@@ -280,7 +283,7 @@ for idx, path in enumerate(settings.files):
     cmd["token"] = path
     if path == '-':
         cmd.read_stdin()
-    elif os.path.isfile(path):
+    elif isfile(path):
         cmd.read_file(path)
     else:
         cmd['data'] = "0"
