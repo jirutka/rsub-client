@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
 import getopt
+import logging
 import os
 import socket
 import sys
 import shutil
+from logging import DEBUG, INFO, StreamHandler
 from os import W_OK
 from os.path import isfile
 from socket import AF_INET, SOCK_STREAM
@@ -20,10 +22,7 @@ DATE = '2014-08-18'
 VERSION = '1.0.0'
 VERSION_STRING = 'rmate version %s (%s)' % (DATE, VERSION)
 
-
-def log(msg):
-    if settings.verbose:
-        sys.stderr.write(msg.strip() + '\n')
+log = logging.getLogger(__name__)
 
 
 def enc(string):
@@ -43,7 +42,7 @@ def dec(byte_string):
 def handle_save(variables, data):
     path = variables['token']
     try:
-        log('Saving %s' % path)
+        log.debug("Saving %s", path)
         backup_path = '%s~' % path
         while isfile(backup_path):
             backup_path = '%s~' % backup_path
@@ -54,12 +53,12 @@ def handle_save(variables, data):
         if isfile(backup_path):
             os.remove(backup_path)
     except (IOError, OSError):
-        log("Save failed!")
+        log.debug("Save failed!")
 
 
 def handle_close(variables):
     path = variables['token']
-    log("Closed %s" % path)
+    log.debug("Closed %s", path)
 
 
 def handle_cmd(textmate, cmd):
@@ -92,16 +91,16 @@ def connect_to_tm():
         textmate_sock.setblocking(True)
         textmate = textmate_sock.makefile('rwb')
     except socket.error:
-        sys.stderr.write("Error connecting to TextMate!\n")
+        log.error("Error connecting to TextMate!")
         exit(1)
 
     server_info = dec(textmate.readline())
 
     if server_info.strip() == "":
-        sys.stderr.write("Couldn't connect to TextMate!\n")
+        log.error("Couldn't connect to TextMate!")
         exit(1)
 
-    log('Connect: %s' % server_info)
+    log.debug("Connect: %s", server_info)
 
     return textmate
 
@@ -118,7 +117,7 @@ def handle_cmds(textmate, cmds):
     for command in textmate:
         handle_cmd(textmate, dec(command).strip())
     textmate.close()
-    log('Done')
+    log.debug("Done.")
 
 
 class Settings:
@@ -166,7 +165,7 @@ class Settings:
         try:
             config.read(['/etc/rmate.rc', os.path.expanduser('~/.rmate.rc')])
         except:
-            sys.stderr.write('Could not read settings from disk.\n')
+            log.debug("Could not read settings from disk.")
         if config.has_option('NOSECTION', 'host'):
             self.host = config.get('NOSECTION', 'host')
         if config.has_option('NOSECTION', 'port'):
@@ -248,18 +247,21 @@ class Command:
 
 settings = Settings()
 
+log.setLevel(DEBUG if settings.verbose else INFO)
+log.addHandler(StreamHandler())
+
 cmds = []
 for idx, path in enumerate(settings.files):
     if path == '-' and sys.stdin.isatty():
-        sys.stderr.write('Reading from stdin, press ^D to stop\n')
+        log.info("Reading from stdin, press ^D to stop")
     elif os.path.isdir(path):
-        sys.stderr.write("'%s' is a directory!\n" % path)
+        log.warning("'%s' is a directory!", path)
         continue
     elif isfile(path) and not os.access(path, W_OK):
         if settings.force:
-            log("File %s is not writable. Opening anyway." % path)
+            log.debug("File %s is not writable. Opening anyway.", path)
         else:
-            sys.stderr.write("File %s is not writable! Use -f/--force to open anyway.\n" % path)
+            log.warning("File %s is not writable! Use -f/--force to open anyway.", path)
             continue
 
     cmd = Command("open")
