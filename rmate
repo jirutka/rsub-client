@@ -5,11 +5,10 @@ import logging
 import os
 import socket
 import sys
-import shutil
+from contextlib import contextmanager
 from logging import DEBUG, INFO, StreamHandler
 from os import W_OK
 from os.path import isfile
-from socket import AF_INET, SOCK_STREAM
 
 if sys.version_info >= (3, 0):
     from configparser import ConfigParser, NoOptionError, NoSectionError
@@ -25,99 +24,34 @@ VERSION_STRING = 'rmate version %s (%s)' % (DATE, VERSION)
 log = logging.getLogger(__name__)
 
 
-def enc(string):
-    if sys.version_info >= (3, 0):
-        return bytes(string, 'utf-8')
-    else:
-        return string
+@contextmanager
+def atomic_write(filepath):
+    """ Writeable file object that atomically updates a file.
 
-
-def dec(byte_string):
-    if sys.version_info >= (3, 0):
-        return str(byte_string, 'utf-8')
-    else:
-        return byte_string
-
-
-def handle_save(variables, data):
-    path = variables['token']
+    :param filepath: path of the file to be opened for writing (in binary mode)
+    """
+    tmppath = filepath + '~'
+    while isfile(tmppath):
+        tmppath += '~'
     try:
-        log.debug("Saving %s", path)
-        backup_path = '%s~' % path
-        while isfile(backup_path):
-            backup_path = '%s~' % backup_path
-        if isfile(path):
-            shutil.copy2(path, backup_path)
-        file = open(path, 'wb')
-        file.write(data)
-        if isfile(backup_path):
-            os.remove(backup_path)
-    except (IOError, OSError):
-        log.debug("Save failed!")
+        with open(tmppath, 'wb') as file:
+            yield file
+        os.rename(tmppath, filepath)
+    finally:
+        try:
+            os.remove(tmppath)
+        except EnvironmentError:
+            pass
 
 
-def handle_close(variables):
-    path = variables['token']
-    log.debug("Closed %s", path)
+class ConnectionError(Exception):
 
+    def __init__(self, msg, cause=None):
+        self.msg = msg
+        self.cause = cause
 
-def handle_cmd(textmate, cmd):
-    variables = {}
-    data = enc('')
-    for line in textmate:
-        line = dec(line)
-        if line.strip() == "":
-            break
-        s = line.split(': ', 2)
-        name = s[0].strip()
-        value = s[1].strip()
-        variables[name] = value
-        if name == 'data':
-            data += textmate.read(int(value))
-
-    if 'data' in variables:
-        del variables['data']
-    if cmd == 'save':
-        handle_save(variables, data)
-    elif cmd == 'close':
-        handle_close(variables)
-
-
-def connect_to_tm():
-    try:
-        socket.setdefaulttimeout(5)
-        textmate_sock = socket.socket(AF_INET, SOCK_STREAM)
-        textmate_sock.connect((settings.host, settings.port))
-        textmate_sock.setblocking(True)
-        textmate = textmate_sock.makefile('rwb')
-    except socket.error:
-        log.error("Error connecting to TextMate!")
-        exit(1)
-
-    server_info = dec(textmate.readline())
-
-    if server_info.strip() == "":
-        log.error("Couldn't connect to TextMate!")
-        exit(1)
-
-    log.debug("Connect: %s", server_info)
-
-    return textmate
-
-
-def handle_cmds(textmate, cmds):
-    if len(cmds) == 0:
-        return
-
-    for cmd in cmds:
-        cmd.send(textmate)
-    textmate.write(enc('.\n'))
-
-    textmate.flush()
-    for command in textmate:
-        handle_cmd(textmate, dec(command).strip())
-    textmate.close()
-    log.debug("Done.")
+    def __str__(self):
+        return self.msg
 
 
 class Settings:
@@ -228,34 +162,175 @@ class SectionLessConfigParser(ConfigParser):
             return None
 
 
-class Command:
-    def __init__(self, command):
-        self.command = command
-        self.variables = {}
-        self.data = None
-        self.size = None
+class FileInfo(object):
 
-    def __setitem__(self, index, value):
-        self.variables[index] = value
+    """ This class represents a file to be opened in the remote editor. """
 
-    def read_stdin(self):
-        self.data = enc(sys.stdin.read())
-        self.size = len(self.data)
+    def __init__(self, data, filepath=None):
+        self.data = data
+        self.file_path = filepath
+        self.display_name = "%s:%s" % (socket.gethostname(), filepath or "untitled (stdin)")
+        self.file_type = None
+        self.line_num = None
 
-    def read_file(self, path):
-        with open(path, 'rb') as f:
-            self.data = f.read()
-            self.size = f.tell()
+    @staticmethod
+    def from_stdin():
+        """ Read data from the stdin and return FileInfo object. """
 
-    def send(self, textmate):
-        textmate.write(enc(self.command + '\n'))
-        for name in self.variables.keys():
-            value = self.variables[name]
-            textmate.write(enc('%s: %s\n' % (name, value)))
-        if self.data is not None:
-            textmate.write(enc('data: %d\n' % self.size))
-            textmate.write(self.data)
-        textmate.write(enc('\n'))
+        log.info("Reading from stdin, press ^D to stop")
+        return FileInfo(sys.stdin.read().encode('utf8'))
+
+    @staticmethod
+    def from_file(filepath):
+        """ Create FileInfo object from the file path.
+
+        If path of an existing file is given, then it reads the file. Otherwise
+        the file will be created during first save.
+        """
+        data = b''
+        if isfile(filepath):
+            with open(filepath, 'rb') as f:
+                data = f.read()
+        return FileInfo(data, filepath)
+
+    def variables(self):
+        """ Return a dict of variables as specified in rmate. """
+        dic = {
+            'display-name': self.display_name,
+            'file-type': self.file_type,
+            'real-path': os.path.abspath(self.file_path) if self.file_path else None,
+            'selection': self.line_num or None,
+            'token': self.file_path or '-',
+            # to be compatible with TextMate
+            'data-on-save': 'yes',
+            're-activate': 'yes'
+        }
+        return {k: v for k, v in dic.items() if v is not None}.items()
+
+
+class RemoteEditorClient(object):
+
+    def __init__(self, host, port):
+        """ Initialize connection with a remote editor.
+
+        :param host: IP address or domain name of the remote editor
+        :param port: port number that the remote editor listens on
+        :raises ConnectionError: if failed to connect to the editor
+        """
+        try:
+            self._socket = socket.create_connection((host, port))
+            self._rfile = self._socket.makefile('rb')
+            self._wfile = self._socket.makefile('wb')
+        except EnvironmentError as e:
+            raise ConnectionError("Could not connect to editor!", e)
+
+        server_hello = next(self._readlines())
+        if not server_hello:
+            self.close()
+            raise ConnectionError("No response from editor!")
+
+        log.debug("Connected to: %s", server_hello)
+
+    def send_files(self, files):
+        """ Open files in the remote editor.
+
+        :param files: list of :class:`FileInfo` instances
+        """
+        send = self._send
+
+        for file in files:
+            send("open\n")
+            for name, value in file.variables():
+                send("%s: %s\n" % (name, value))
+            send("data: %d\n" % len(file.data))
+            if file.data != b'':
+                send(file.data)
+            send("\n")
+        send(".\n")
+        self._wfile.flush()
+
+    def listen(self):
+        """ Start listening on the socket for commands from the editor.
+
+        This method is blocking; it finish when the socket is closed.
+        """
+        for line in self._readlines():
+            if line == 'save':
+                self._handle_save()
+            elif line == 'close':
+                self._handle_close()
+            else:
+                log.debug("Unknown command: %s", line)
+        self.close()
+
+    def close(self):
+        """ Close the socket and all the opened file objects. """
+
+        log.debug("Closing connection...")
+        if self._wfile:
+            self._wfile.close()
+        if self._rfile:
+            self._rfile.close()
+        try:
+            self._socket.shutdown(socket.SHUT_RDWR)
+            self._socket.close()
+        except EnvironmentError:
+            pass
+        self._socket = None
+
+    def _handle_save(self):
+        """ Handle *save* command; write received file. """
+
+        variables, data = self._read_response()
+        path = variables['token']
+        
+        log.debug("Received update: %s", path)
+        try:
+            with atomic_write(path) as f:
+                f.write(data)
+        except EnvironmentError:
+            log.debug("Failed to write file: %s", path)
+
+    def _handle_close(self):
+        """ Handle *close* command; just log it. """
+        variables, data = self._read_response()
+        path = variables['token']
+        log.debug("Closed: %s", path)
+
+    def _read_response(self):
+        """ Return tuple of variables and data read from the socket. """
+
+        variables = {}
+        data = b""
+
+        for line in self._readlines():
+            if line == "":
+                break
+            name, value = (s.strip() for s in line.split(":", 1))
+            if name == 'data':
+                data += self._rfile.read(int(value))
+            else:
+                variables[name] = value
+
+        return (variables, data)
+
+    def _send(self, data):
+        """ Write data to the socket.
+
+        :param data: bytes or string (will be encoded as UTF-8)
+        """
+        if not isinstance(data, bytes):
+            data = data.encode('utf8')
+        self._wfile.write(data)
+
+    def _readlines(self):
+        """ Read lines from the socket.
+
+        :returns: generator that reads line by line from the socket, decodes
+                  lines as UTF-8 and strips white spaces
+        """
+        return (line.decode('utf8').strip() for line in self._rfile)
+
 
 ## MAIN ##
 
@@ -264,50 +339,39 @@ settings = Settings()
 log.setLevel(DEBUG if settings.verbose else INFO)
 log.addHandler(StreamHandler())
 
-cmds = []
+files = []
 for idx, path in enumerate(settings.files):
     if path == '-' and sys.stdin.isatty():
-        log.info("Reading from stdin, press ^D to stop")
+        file = FileInfo.from_stdin()
     elif os.path.isdir(path):
         log.warning("'%s' is a directory!", path)
         continue
-    elif isfile(path) and not os.access(path, W_OK):
-        if settings.force:
-            log.debug("File %s is not writable. Opening anyway.", path)
-        else:
-            log.warning("File %s is not writable! Use -f/--force to open anyway.", path)
-            continue
+    else:
+        if isfile(path) and not os.access(path, W_OK):
+            if settings.force:
+                log.debug("File %s is not writable. Opening anyway.", path)
+            else:
+                log.warning("File %s is not writable! Use -f/--force to open anyway.", path)
+                continue
+        file = FileInfo.from_file(path)
 
-    cmd = Command("open")
     if len(settings.names) > idx:
-        cmd['display-name'] = settings.names[idx]
-    elif path == '-':
-        cmd['display-name'] = '%s:untitled (stdin)' % socket.gethostname()
-    else:
-        cmd['display-name'] = '%s:%s' % (socket.gethostname(), path)
+        file.display_name = settings.names[idx]
     if len(settings.types) > idx:
-        cmd['file-type'] = settings.types[idx]
-    elif path == '-':
-        cmd['file-type'] = 'txt'
-    if path != '-':
-        cmd['real-path'] = os.path.abspath(path)
+        file.file_type = settings.types[idx]
     if len(settings.lines) > idx:
-        cmd['selection'] = settings.lines[idx]
+        file.line_num = settings.lines[idx]
 
-    cmd["data-on-save"] = 'yes'
-    cmd["re-activate"] = 'yes'
-    cmd["token"] = path
-    if path == '-':
-        cmd.read_stdin()
-    elif isfile(path):
-        cmd.read_file(path)
-    else:
-        cmd['data'] = "0"
-    cmds.append(cmd)
+    files.append(file)
 
-s = connect_to_tm()
+try:
+    client = RemoteEditorClient(settings.host, settings.port)
+    client.send_files(files)
 
-if not settings.wait and os.fork():
-    sys.exit()
+    if not settings.wait and os.fork():
+        sys.exit()
 
-handle_cmds(s, cmds)
+    client.listen()
+
+except ConnectionError as e:
+    log.error(e.msg)
