@@ -3,10 +3,12 @@
 """
 Open file(s) in Sublime Text or TextMate 2 from a remote machine.
 
-Usage: rsub [options] [-l NUM...] [-m NAME...] [-t TYPE...] FILE...
+Usage:
+  rsub [options] [-l NUM] [-m NAME] [-t TYPE] -
+  rsub [options] [-l NUM...] [-m NAME...] [-t TYPE...] FILE...
 
+  -                     Read from the standard input.
   FILE                  File to open (will be created if does not exist yet).
-                        Use '-' to read from the standard input.
 
   -l NUM --line=NUM     Place caret on line [NUM] after loading file.
   -m NAME --name=NAME   The display name shown in editor.
@@ -76,6 +78,9 @@ def parse_cli_args():
     # Pluralize names of repeated options.
     for key in ['FILE', 'line', 'name', 'type']:
         kwargs[key.lower() + 's'] = kwargs.pop(key)
+
+    if kwargs.pop('-'):
+        kwargs['files'] = [sys.stdin]
 
     # Remove items with value None.
     return {k: v for k, v in kwargs.items() if v is not None}
@@ -348,7 +353,7 @@ def main():
 
     files = []
     for idx, path in enumerate(conf.files):
-        if path == '-' and sys.stdin.isatty():
+        if path is sys.stdin:
             file = FileInfo.from_stdin()
         elif os.path.isdir(path):
             log.warning("'%s' is a directory!", path)
@@ -374,6 +379,10 @@ def main():
     try:
         client = RemoteEditorClient(conf.host, conf.port)
         client.send_files(files)
+
+        if sys.stdin in conf.files:
+            client.close()
+            sys.exit()
 
         if not conf.wait:
             # exit itself after child forked

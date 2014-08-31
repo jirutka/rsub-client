@@ -56,7 +56,12 @@ anywhere, add this directory to your `PATH` (choose one according to shell youâ€
 
 You can use `rsub --help` to see the usage:
 
-    Usage: rsub [options] [-l NUM...] [-m NAME...] [-t TYPE...] FILE...
+    Usage:
+      rsub [options] [-l NUM] [-m NAME] [-t TYPE] -
+      rsub [options] [-l NUM...] [-m NAME...] [-t TYPE...] FILE...
+
+      -                     Read from the standard input.
+      FILE                  File to open (will be created if does not exist yet).
 
       FILE                  File to open (will be created if does not exist yet).
                             Use '-' to read from the standard input.
