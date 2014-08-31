@@ -223,7 +223,9 @@ class FileInfo(object):
         return {k: v for k, v in dic.items() if v is not None}.items()
 
 
-class RemoteEditorClient(object):
+class RSubClient(object):
+
+    """ Client that handles communication with a remote editor via sockets. """
 
     def __init__(self, host, port):
         """ Initialize connection with a remote editor.
@@ -380,7 +382,7 @@ def main():
         files.append(file)
 
     try:
-        client = RemoteEditorClient(conf.host, conf.port)
+        client = RSubClient(conf.host, conf.port)
         client.send_files(files)
 
         if sys.stdin in conf.files:
