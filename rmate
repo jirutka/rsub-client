@@ -330,56 +330,60 @@ class RemoteEditorClient(object):
         return (line.decode('utf8').strip() for line in self._rfile)
 
 
-## MAIN ##
+##########################  M a i n  #########################
 
-# Defaults
-config = {'host': 'localhost', 'port': 52698}
+def main():
+    # Defaults
+    conf = AttrDict({'host': 'localhost', 'port': 52698})
 
-config.update(read_settings_rcfiles())
-config.update(read_settings_env())
-config.update(parse_cli_args())
+    conf.update(read_settings_rcfiles())
+    conf.update(read_settings_env())
+    conf.update(parse_cli_args())
 
-if config['host'] == 'auto' and os.getenv('SSH_CONNECTION', None):
-    config['host'] = os.getenv('SSH_CONNECTION', "localhost").split(' ')[0]
+    if conf.host == 'auto' and os.getenv('SSH_CONNECTION', None):
+        conf.host = os.getenv('SSH_CONNECTION', "localhost").split(' ')[0]
 
-settings = AttrDict(config)
+    log.setLevel(DEBUG if conf.verbose else INFO)
+    log.addHandler(StreamHandler())
 
-log.setLevel(DEBUG if settings.verbose else INFO)
-log.addHandler(StreamHandler())
+    files = []
+    for idx, path in enumerate(conf.files):
+        if path == '-' and sys.stdin.isatty():
+            file = FileInfo.from_stdin()
+        elif os.path.isdir(path):
+            log.warning("'%s' is a directory!", path)
+            continue
+        else:
+            if isfile(path) and not os.access(path, W_OK):
+                if conf.force:
+                    log.debug("File %s is not writable. Opening anyway.", path)
+                else:
+                    log.warning("File %s is not writable! Use -f/--force to open anyway.", path)
+                    continue
+            file = FileInfo.from_file(path)
 
-files = []
-for idx, path in enumerate(settings.files):
-    if path == '-' and sys.stdin.isatty():
-        file = FileInfo.from_stdin()
-    elif os.path.isdir(path):
-        log.warning("'%s' is a directory!", path)
-        continue
-    else:
-        if isfile(path) and not os.access(path, W_OK):
-            if settings.force:
-                log.debug("File %s is not writable. Opening anyway.", path)
-            else:
-                log.warning("File %s is not writable! Use -f/--force to open anyway.", path)
-                continue
-        file = FileInfo.from_file(path)
+        if len(conf.names) > idx:
+            file.display_name = conf.names[idx]
+        if len(conf.types) > idx:
+            file.file_type = conf.types[idx]
+        if len(conf.lines) > idx:
+            file.line_num = conf.lines[idx]
 
-    if len(settings.names) > idx:
-        file.display_name = settings.names[idx]
-    if len(settings.types) > idx:
-        file.file_type = settings.types[idx]
-    if len(settings.lines) > idx:
-        file.line_num = settings.lines[idx]
+        files.append(file)
 
-    files.append(file)
+    try:
+        client = RemoteEditorClient(conf.host, conf.port)
+        client.send_files(files)
 
-try:
-    client = RemoteEditorClient(settings.host, settings.port)
-    client.send_files(files)
+        if not conf.wait:
+            # exit itself after child forked
+            os.fork() and sys.exit()
 
-    if not settings.wait and os.fork():
-        sys.exit()
+        client.listen()
 
-    client.listen()
+    except ConnectionError as e:
+        log.error(e.msg)
 
-except ConnectionError as e:
-    log.error(e.msg)
+
+if __name__ == "__main__":
+    main()
