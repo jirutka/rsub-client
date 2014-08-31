@@ -378,6 +378,7 @@ def main():
         if not conf.wait:
             # exit itself after child forked
             os.fork() and sys.exit()
+            log.debug("Forked PID: %d" % os.getpid())
 
         client.listen()
 
