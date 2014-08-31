@@ -398,6 +398,7 @@ def main():
 
     except ConnectionError as e:
         log.error(e.msg)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
