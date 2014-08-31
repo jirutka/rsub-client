@@ -20,7 +20,7 @@ setup(
     name="rsub",
     version="1.0.0",
     url="https://github.com/jirutka/rsub-client",
-    description="Open files in Sublime Text or TextMate 2 from a remote machine.",
+    description="Open and edit files from a remote machine in your local Sublime Text or TextMate 2.",
     long_description=read_md("README.md"),
     author="Jakub Jirutka",
     author_email="jakub@jirutka.cz",

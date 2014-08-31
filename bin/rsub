@@ -2,7 +2,8 @@
 # coding: utf-8
 
 """
-Open file(s) in Sublime Text or TextMate 2 from a remote machine.
+Open and edit files from a remote machine in your local Sublime Text or
+TextMate 2. To get it work on Sublime Text you need the rsub plugin.
 
 Usage:
   rsub [options] [-l NUM] [-m NAME] [-t TYPE] -
@@ -11,18 +12,20 @@ Usage:
   -                     Read from the standard input.
   FILE                  File to open (will be created if does not exist yet).
 
-  -l NUM --line=NUM     Place caret on line [NUM] after loading file.
+  -l NUM --line=NUM     Place caret on line [NUM] after loading the file.
   -m NAME --name=NAME   The display name shown in editor.
-  -t TYPE --type=TYPE   Treat file as having [TYPE].
+  -t TYPE --type=TYPE   Treat file as having [TYPE] (e.g. rb, py, md).
 
 Options:
   -H HOST --host=HOST   Connect to host. Use 'auto' to detect the host from SSH.
   -p PORT --port=PORT   Port number to use for connection.
-  -w --wait             Wait for file to be closed by the editor.
+  -w --wait             Wait for file(s) to be closed by the editor.
   -f --force            Open even if the file is not writable.
   -v --verbose          Verbose logging messages.
   -h --help             Show this message and exit.
   --version             Show version and exit.
+
+More information can be found on https://github.com/jirutka/rsub-client.
 """
 
 __version__ = '1.0.0'

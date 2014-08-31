@@ -3,7 +3,7 @@ Remote Sublime Text (rsub)
 [![version](https://badge.fury.io/py/rsub-client.svg)](https://pypi.python.org/pypi/rsub-client)
 [![downloads](https://pypip.in/d/rsub-client/badge.svg)](https://pypi.python.org/pypi/rsub-client)
 
-With `rsub` you can open and edit files from a remote machine (you’re connected via SSH) on your
+With `rsub` you can open and edit files from a remote machine (you’re connected via SSH) in your
 local [Sublime Text](http://www.sublimetext.com/)* or [TextMate 2](https://github.com/textmate/textmate).
 No need to setup a shared filesystem or anything like that, just a
 [SSH tunnel](#setting-up-the-connection)!
@@ -63,17 +63,14 @@ You can use `rsub --help` to see the usage:
       -                     Read from the standard input.
       FILE                  File to open (will be created if does not exist yet).
 
-      FILE                  File to open (will be created if does not exist yet).
-                            Use '-' to read from the standard input.
-
-      -l NUM --line=NUM     Place caret on line [NUM] after loading file.
+      -l NUM --line=NUM     Place caret on line [NUM] after loading the file.
       -m NAME --name=NAME   The display name shown in editor.
-      -t TYPE --type=TYPE   Treat file as having [TYPE].
+      -t TYPE --type=TYPE   Treat file as having [TYPE] (e.g. rb, py, md).
 
     Options:
       -H HOST --host=HOST   Connect to host. Use 'auto' to detect the host from SSH.
       -p PORT --port=PORT   Port number to use for connection.
-      -w --wait             Wait for file to be closed by the editor.
+      -w --wait             Wait for file(s) to be closed by the editor.
       -f --force            Open even if the file is not writable.
       -v --verbose          Verbose logging messages.
       -h --help             Show this message and exit.
