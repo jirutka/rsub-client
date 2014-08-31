@@ -88,7 +88,7 @@ variables.
 
 ## Setting up the connection
 
-To do it’s job, `rsub` needs a connection back to your computer so that it can talk to Sublime Text
+To do its job, `rsub` needs a connection back to your computer so that it can talk to Sublime Text
 or TextMate. There are multiple ways you can accomplish this, but probably the best way is to use a
 reverse SSH tunnel:
 
