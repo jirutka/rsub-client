@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 
 """
 Open file(s) in Sublime Text or TextMate 2 from a remote machine.
@@ -65,6 +66,14 @@ def atomic_write(filepath):
             os.remove(tmppath)
         except EnvironmentError:
             pass
+
+
+def enc(string):
+    """ Return an encoded (binary) version of the string. """
+    if not isinstance(string, bytes) and sys.version_info >= (3, 0):
+        return bytes(string, 'utf-8')
+    else:
+        return string
 
 
 def parse_cli_args():
@@ -181,7 +190,7 @@ class FileInfo(object):
         """ Read data from the stdin and return FileInfo object. """
 
         log.info("Reading from stdin, press ^D to stop")
-        return FileInfo(sys.stdin.read().encode('utf8'))
+        return FileInfo(enc(sys.stdin.read()))
 
     @staticmethod
     def from_file(filepath):
@@ -239,7 +248,7 @@ class RemoteEditorClient(object):
 
         :param files: list of :class:`FileInfo` instances
         """
-        send = self._send
+        send = lambda data: self._wfile.write(enc(data))
 
         for file in files:
             send("open\n")
@@ -317,22 +326,13 @@ class RemoteEditorClient(object):
 
         return (variables, data)
 
-    def _send(self, data):
-        """ Write data to the socket.
-
-        :param data: bytes or string (will be encoded as UTF-8)
-        """
-        if not isinstance(data, bytes):
-            data = data.encode('utf8')
-        self._wfile.write(data)
-
     def _readlines(self):
         """ Read lines from the socket.
 
         :returns: generator that reads line by line from the socket, decodes
                   lines as UTF-8 and strips white spaces
         """
-        return (line.decode('utf8').strip() for line in self._rfile)
+        return (line.decode('utf-8').strip() for line in self._rfile)
 
 
 ##########################  M a i n  #########################
