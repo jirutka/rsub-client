@@ -28,8 +28,6 @@ Options:
 More information can be found on https://github.com/jirutka/rsub-client.
 """
 
-__version__ = '1.0.0'
-
 import logging
 import os
 import socket
@@ -47,6 +45,8 @@ if sys.version_info >= (3, 0):
 else:
     from ConfigParser import ConfigParser, NoOptionError, NoSectionError
     from StringIO import StringIO
+
+__version__ = '1.0.0'
 
 log = logging.getLogger(__name__)
 
@@ -253,7 +253,8 @@ class RSubClient(object):
 
         :param files: list of :class:`FileInfo` instances
         """
-        send = lambda data: self._wfile.write(enc(data))
+        def send(data):
+            self._wfile.write(enc(data))
 
         for file in files:
             send("open\n")
@@ -340,7 +341,7 @@ class RSubClient(object):
         return (line.decode('utf-8').strip() for line in self._rfile)
 
 
-##########################  M a i n  #########################
+# #########################  M a i n  ######################## #
 
 def main():
     # Defaults
