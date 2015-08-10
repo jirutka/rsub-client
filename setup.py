@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-
-# Fix encoding problem.
 import sys
-reload(sys)
-sys.setdefaultencoding('utf8')
+
+# Fix encoding problem on Python 2.x.
+if sys.version_info < (3, 0):
+    reload(sys)
+    sys.setdefaultencoding('utf8')
 
 try:
     from setuptools import setup
