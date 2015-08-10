@@ -1,7 +1,7 @@
 Remote Sublime Text (rsub)
 ==========================
-[![version](https://badge.fury.io/py/rsub.svg)](https://pypi.python.org/pypi/rsub)
-[![downloads](https://pypip.in/d/rsub/badge.svg)](https://pypi.python.org/pypi/rsub)
+[![version](https://img.shields.io/pypi/v/rsub.svg?style=flat)](https://pypi.python.org/pypi/rsub)
+[![downloads](https://img.shields.io/pypi/dm/rsub.svg?style=flat)](https://pypi.python.org/pypi/rsub)
 
 With `rsub` you can open and edit files from a remote machine (you’re connected via SSH) in your
 local [Sublime Text](http://www.sublimetext.com/)* or [TextMate 2](https://github.com/textmate/textmate).
