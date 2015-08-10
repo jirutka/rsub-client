@@ -113,10 +113,10 @@ def read_settings_rcfiles():
 
     config = SectionLessConfigParser()
     try:
-        config.read("/etc/rmate.rc", "/etc/rsubrc",
-                    expanduser("~/.rmate.rc"), expanduser("~/.rsubrc"))
+        config.read('/etc/rmate.rc', '/etc/rsubrc',
+                    expanduser('~/.rmate.rc'), expanduser('~/.rsubrc'))
     except:
-        log.debug("Could not read settings from disk.")
+        log.debug('Could not read settings from disk.')
 
     return config.to_dict()
 
@@ -184,7 +184,7 @@ class FileInfo(object):
     def __init__(self, data, filepath=None):
         self.data = data
         self.file_path = filepath
-        self.display_name = "%s:%s" % (socket.gethostname(), filepath or "untitled (stdin)")
+        self.display_name = "%s:%s" % (socket.gethostname(), filepath or 'untitled (stdin)')
         self.file_type = None
         self.line_num = None
 
@@ -192,7 +192,7 @@ class FileInfo(object):
     def from_stdin():
         """ Read data from the stdin and return FileInfo object. """
 
-        log.info("Reading from stdin, press ^D to stop")
+        log.info('Reading from stdin, press ^D to stop')
         return FileInfo(enc(sys.stdin.read()))
 
     @staticmethod
@@ -239,12 +239,12 @@ class RSubClient(object):
             self._rfile = self._socket.makefile('rb')
             self._wfile = self._socket.makefile('wb')
         except EnvironmentError as e:
-            raise ConnectionError("Could not connect to editor!", e)
+            raise ConnectionError('Could not connect to editor!', e)
 
         server_hello = next(self._readlines())
         if not server_hello:
             self.close()
-            raise ConnectionError("No response from editor!")
+            raise ConnectionError('No response from editor!')
 
         log.debug("Connected to: %s", server_hello)
 
@@ -257,14 +257,14 @@ class RSubClient(object):
             self._wfile.write(enc(data))
 
         for file in files:
-            send("open\n")
+            send('open\n')
             for name, value in file.variables():
                 send("%s: %s\n" % (name, value))
             send("data: %d\n" % len(file.data))
             if file.data != b'':
                 send(file.data)
-            send("\n")
-        send(".\n")
+            send('\n')
+        send('.\n')
         self._wfile.flush()
 
     def listen(self):
@@ -284,7 +284,7 @@ class RSubClient(object):
     def close(self):
         """ Close the socket and all the opened file objects. """
 
-        log.debug("Closing connection...")
+        log.debug('Closing connection...')
         if self._wfile:
             self._wfile.close()
         if self._rfile:
@@ -319,12 +319,12 @@ class RSubClient(object):
         """ Return tuple of variables and data read from the socket. """
 
         variables = {}
-        data = b""
+        data = b''
 
         for line in self._readlines():
-            if line == "":
+            if line == '':
                 break
-            name, value = (s.strip() for s in line.split(":", 1))
+            name, value = (s.strip() for s in line.split(':', 1))
             if name == 'data':
                 data += self._rfile.read(int(value))
             else:
@@ -352,7 +352,7 @@ def main():
     conf.update(parse_cli_args())
 
     if conf.host == 'auto' and os.getenv('SSH_CONNECTION', None):
-        conf.host = os.getenv('SSH_CONNECTION', "localhost").split(' ')[0]
+        conf.host = os.getenv('SSH_CONNECTION', 'localhost').split(' ')[0]
 
     log.setLevel(DEBUG if conf.verbose else INFO)
     log.addHandler(StreamHandler())
@@ -402,5 +402,5 @@ def main():
         sys.exit(2)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
