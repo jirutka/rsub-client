@@ -19,7 +19,7 @@ except ImportError:
 
 setup(
     name='rsub',
-    version='1.0.0',
+    version='1.0.1',
     url='https://github.com/jirutka/rsub-client',
     description='Open and edit files from a remote machine in your local Sublime Text or TextMate 2.',
     long_description=read_md('README.md'),

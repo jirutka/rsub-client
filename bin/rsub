@@ -46,7 +46,7 @@ else:
     from ConfigParser import ConfigParser, NoOptionError, NoSectionError
     from StringIO import StringIO
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 log = logging.getLogger(__name__)
 
