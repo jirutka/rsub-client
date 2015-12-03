@@ -167,7 +167,10 @@ class SectionLessConfigParser(ConfigParser, object):
 
     def to_dict(self):
         """ Return options for the fake section as a dict. """
-        return dict(self.items(self.FAKE_SECTION))
+        try:
+            return dict(self.items(self.FAKE_SECTION))
+        except NoSectionError:
+            return {}
 
     def __getitem__(self, option):
         """ Get an option value for the fake section. """
